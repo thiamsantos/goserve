@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
+	"runtime"
 )
 
 func withLogging(next http.Handler) http.Handler {
@@ -14,6 +16,23 @@ func withLogging(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+func openDefault(fileOrURL string) error {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default: // "linux", "freebsd", "openbsd", "netbsd"
+		cmd = "xdg-open"
+	}
+	args = append(args, fileOrURL)
+	return exec.Command(cmd, args...).Start()
 }
 
 func main() {
@@ -41,9 +60,11 @@ func main() {
 	fs := http.FileServer(http.Dir(path))
 	http.Handle("/", withLogging(fs))
 	addr := fmt.Sprintf(":%d", port)
+	url := fmt.Sprintf("http://localhost:%d", port)
 
-	log.Printf("Serving %s at http://localhost:%d\n", path, port)
+	log.Printf("Serving %s at %s\n", path, url)
 
+	go openDefault(url)
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal(err)
